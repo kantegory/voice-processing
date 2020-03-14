@@ -32,7 +32,7 @@ def file2bucket(filename, bucket):
 
 def speech2text(filename, bucket):
     transcribe = session.client('transcribe')
-    job_name = "jobname12{}".format(filename)
+    job_name = "1jobname12{}".format(filename)
     job_uri = "https://s3.{}.amazonaws.com/{}/{}".format(CONFIG['region_name'], bucket, filename)
 
     transcribe.start_transcription_job(
@@ -55,35 +55,51 @@ def speech2text(filename, bucket):
 
     r = requests.get(link)
     result = json.loads(r.text)
-    # result = result['results']['items']
-    result = result['results']['transcripts'][0]['transcript']
+    result = result['results']['items']
+    # result = result['results']['transcripts'][0]['transcript']
     print(result)
 
     return result
 
 
+def json2ssml(json):
+    words = json
+    ssml = ''
+
+    for i in range(len(words)):
+        word_type = words[i]['type']
+
+        if word_type == 'pronunciation':
+
+            start = float(words[i]['start_time'])
+            end = float(words[i]['end_time'])
+            pause = end - start
+            # ssml += '<break time="{}ms" />'.format(pause)
+            # ssml += '<amazon:breath duration="short" volume="x-loud" />'
+
+        content = words[i]['alternatives'][0]['content']
+
+        ssml += content + ' '
+
+    ssml = '<speak><prosody rate="85%"><amazon:auto-breaths>{}</amazon:auto-breaths></prosody></speak>'.format(ssml)
+    print(ssml)
+
+    return ssml
+
+
 def text2speech(text):
     polly = session.client('polly')
 
-    response = polly.start_speech_synthesis_task(
+    response = polly.synthesize_speech(
         VoiceId='Joanna',
-        OutputS3BucketName='mlhack',
-        OutputS3KeyPrefix='key',
         OutputFormat='mp3',
-        Text=text
+        Text=text,
+        TextType='ssml'
     )
 
-    taskId = response['SynthesisTask']['TaskId']
-
-    while True:
-        status = polly.get_speech_synthesis_task(TaskId=taskId)
-        if status in ['COMPLETED', 'FAILED']:
-            break
-        print("Not ready yet text2speech...")
-        time.sleep(5)
-
-    print(status)
-    return status
+    file = open('speech.mp3', 'wb')
+    file.write(response['AudioStream'].read())
+    file.close()
 
 
 def remove_accent(filename):
@@ -94,8 +110,8 @@ def remove_accent(filename):
 
     # getting result of speech2text
     speech2text_result = speech2text(filename, bucket)
-    text2speech_result = text2speech(speech2text_result)
-    # return result
+    ssml = json2ssml(speech2text_result)
+    text2speech_result = text2speech(ssml)
 
 
 if __name__ == "__main__":
@@ -106,6 +122,9 @@ if __name__ == "__main__":
     )
 
     s3 = session.resource('s3')
+
+    ssml = json2ssml('')
+    text2speech(ssml)
 
     parser = argparse.ArgumentParser(description='Write path to file')
     parser.add_argument('filename', type=str)
