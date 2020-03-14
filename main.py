@@ -32,7 +32,7 @@ def file2bucket(filename, bucket):
 
 def speech2text(filename, bucket):
     transcribe = session.client('transcribe')
-    job_name = "1jobname12{}".format(filename)
+    job_name = "132jobnamefd12{}".format(filename)
     job_uri = "https://s3.{}.amazonaws.com/{}/{}".format(CONFIG['region_name'], bucket, filename)
 
     transcribe.start_transcription_job(
@@ -222,26 +222,32 @@ def json2ssml(json):
             next_step = float(words[i]['start_time'])
             prev_step = 0
             pause = next_step - prev_step
+            start_time = float(words[i]['start_time'])
+            end_time = float(words[i]['end_time'])
 
             if i > 0:
                 prev_word_type = words[i - 1]['type']
 
                 if prev_word_type == 'pronunciation':
                     prev_step = float(words[i - 1]['end_time'])
-                    pause = (next_step - prev_step) * 0.85
+                    pause = (next_step - prev_step)
 
                 elif words[i - 1]['type'] == 'punctuation':
                     pause = 0
 
+
+
             print(pause)
             ssml += '<break time="{}s" />'.format(pause)
-            # ssml += '<amazon:breath duration="short" volume="x-loud" />'
 
-        content = words[i]['alternatives'][0]['content']
+            const = 0.28
+            duration = end_time - start_time
+            speed = 100 * duration / const
 
-        ssml += content
+            content = words[i]['alternatives'][0]['content']
+            ssml += '<prosody rate="{}%">{}</prosody>'.format(speed, content)
 
-    ssml = '<speak><prosody rate="105%">{}</prosody></speak>'.format(ssml)
+    ssml = '<speak>{}</speak>'.format(ssml)
     print(ssml)
 
     return ssml
@@ -257,7 +263,7 @@ def text2speech(text):
         TextType='ssml'
     )
 
-    file = open('speech5.mp3', 'wb')
+    file = open('speech6.mp3', 'wb')
     file.write(response['AudioStream'].read())
     file.close()
 
